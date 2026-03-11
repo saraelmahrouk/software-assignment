@@ -1,4 +1,52 @@
 const fs = require("fs");
+const { start } = require("repl");
+
+fs.readFile('shifts.txt', 'utf8', (err, data) => {
+    if (err) throw err;
+});
+
+
+function timeToSec(time){
+
+    const timeFormat = time.split(" ");
+    let [h, m, s] = timeFormat[0].split(":").map(Number);
+    
+    if(timeFormat.length > 1 && timeFormat[1] == "pm") h += 12;
+
+    let timeSec = h*3600 + m*60 + s;
+    return timeSec;
+}
+
+function secToTime(seconds){
+
+    const h = Math.floor(seconds / 3600);
+    seconds %= 3600;
+    const m = Math.floor(seconds / 60);
+    const s = seconds % 60;
+
+    return `${h}:${String(m).padStart(2,"0")}:${String(s).padStart(2,"0")}`;
+
+}
+
+function validateTimeFormat(time){
+    const regex24 = /^(?:[01]?\d|2[0-3]):[0-5]\d:[0-5]\d\s?$/; 
+    const regex12 = /^(0?[1-9]|1[0-2]):[0-5]\d:[0-5]\d\s?(AM|PM)$/i;
+
+    if( !regex12.test(time) && !regex24.test(time))
+        throw new Error(`The formatting for ${time} is wrong`);
+
+}
+
+function validateMatchingFormat(time1, time2){
+    const regex24 = /^(?:[01]?\d|2[0-3]):[0-5]\d:[0-5]\d\s?$/; 
+    const regex12 = /^(0?[1-9]|1[0-2]):[0-5]\d:[0-5]\d\s?(AM|PM)$/i;
+
+    if((!regex12.test(time1) || !regex12.test(time2)) &&
+    (!regex24.test(time1) || !regex24.test(time2)))
+        throw new Error("Invalid time format");
+
+}
+
 
 // ============================================================
 // Function 1: getShiftDuration(startTime, endTime)
@@ -8,7 +56,21 @@ const fs = require("fs");
 // ============================================================
 function getShiftDuration(startTime, endTime) {
     // TODO: Implement this function
-}
+
+    validateTimeFormat(startTime);
+    validateTimeFormat(endTime);
+    validateMatchingFormat(startTime, endTime);
+
+    let startSec = timeToSec(startTime);
+    let endSec = timeToSec(endTime);
+
+    if (endSec < startSec) endSec += 24*3600;
+
+    let diff = endSec - startSec;
+
+    return secToTime(diff);
+   }
+
 
 // ============================================================
 // Function 2: getIdleTime(startTime, endTime)
@@ -18,7 +80,27 @@ function getShiftDuration(startTime, endTime) {
 // ============================================================
 function getIdleTime(startTime, endTime) {
     // TODO: Implement this function
+
+    validateTimeFormat(startTime);
+    validateTimeFormat(endTime);
+    validateMatchingFormat(startTime, endTime);
+    // if((!regex12.test(startTime) || !regex12.test(endTime)) &&
+    //     (!regex24.test(startTime) || !regex24.test(endTime)))
+    //     return console.log("The format is not the same for start time and end time");
+
+    const lowerBound = 8*3600;
+    const upperBound = 22*3600;
+ 
+    let startSec = timeToSec(startTime);
+    let endSec = timeToSec(endTime);
+
+    let idleTime = 0;
+    idleTime += startSec < lowerBound ? lowerBound - startSec : 0;
+    idleTime += endSec > upperBound ? endSec - upperBound : 0;
+
+    return secToTime(idleTime);
 }
+
 
 // ============================================================
 // Function 3: getActiveTime(shiftDuration, idleTime)
@@ -28,7 +110,18 @@ function getIdleTime(startTime, endTime) {
 // ============================================================
 function getActiveTime(shiftDuration, idleTime) {
     // TODO: Implement this function
+    
+    validateTimeFormat(shiftDuration);
+    validateTimeFormat(idleTime);
+
+    activeTimeSec = timeToSec(shiftDuration) - timeToSec(idleTime);
+
+    return secToTime(activeTimeSec);
+
+
 }
+console.log(getActiveTime("6:01:20", "00:00:00"));
+
 
 // ============================================================
 // Function 4: metQuota(date, activeTime)
@@ -38,6 +131,7 @@ function getActiveTime(shiftDuration, idleTime) {
 // ============================================================
 function metQuota(date, activeTime) {
     // TODO: Implement this function
+
 }
 
 // ============================================================
