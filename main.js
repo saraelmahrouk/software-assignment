@@ -56,6 +56,27 @@ function validateMonth(month){
         throw new Error("Invalid month format");
 }
 
+function validateHoursSum(hours){
+    const regexHours = /^(?:\d?\d?\d|2[0-3]):[0-5]\d:[0-5]\d\s?$/; 
+
+    if( !regexHours.test(hours))
+        throw new Error(`The formatting for ${time} is wrong`);
+
+}
+
+function readFile(textFile){
+    const file  = fs.readFileSync(textFile, 'utf8');
+    const lines = file.split("\n").filter(line => line.trim() !== "");
+    return lines;
+}
+
+
+// function extractMonth(textFile, month){
+//     const file = fs.readFileSync(textFile, 'utf8');
+//     const lines = file.split("\n").filter(line => line.trim() !== "");
+
+// }
+
 // ============================================================
 // Function 1: getShiftDuration(startTime, endTime)
 // startTime: (typeof string) formatted as hh:mm:ss am or hh:mm:ss pm
@@ -119,8 +140,8 @@ function getIdleTime(startTime, endTime) {
 function getActiveTime(shiftDuration, idleTime) {
     // TODO: Implement this function
     
-    validateTimeFormat(shiftDuration);
-    validateTimeFormat(idleTime);
+    validateHoursSum(shiftDuration);
+    validateHoursSum(idleTime);
 
     activeTimeSec = timeToSec(shiftDuration) - timeToSec(idleTime);
 
@@ -129,6 +150,7 @@ function getActiveTime(shiftDuration, idleTime) {
 
 }
 
+// console.log(getActiveTime ("06:40:20", "003:10:10"));
 
 // ============================================================
 // Function 4: metQuota(date, activeTime)
@@ -166,9 +188,8 @@ function addShiftRecord(textFile, shiftObj) {
 
         validateShiftObj(shiftObj);
 
-        const data = fs.readFileSync( textFile, 'utf8')     
+        const lines = readFile(textFile);
         let flag = false;
-        const lines = data.split("\n").filter(line => line.trim() !== "");
 
         lines.forEach(line => {
             if (line.includes(shiftObj.driverID) && line.includes(shiftObj.date)){
@@ -217,13 +238,13 @@ function addShiftRecord(textFile, shiftObj) {
     }
 }
 
-let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-30",
- startTime: "6:32:26 am",  endTime: "7:26:20 pm" };
- let textFile = "shifts.txt"; 
-( () => {
-    let result = addShiftRecord(textFile, shiftObj);
-    console.log(result);
-})();
+// let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-30",
+//  startTime: "6:32:26 am",  endTime: "7:26:20 pm" };
+//  let textFile = "shifts.txt"; 
+// ( () => {
+//     let result = addShiftRecord(textFile, shiftObj);
+//     console.log(result);
+// })();
 
 // ============================================================
 // Function 6: setBonus(textFile, driverID, date, newValue)
@@ -246,8 +267,7 @@ let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-3
      if (!newValue) 
         throw new Error("newValue is required");
 
-    const file  = fs.readFileSync(textFile, 'utf8');
-    const lines = file.split("\n").filter(line => line.trim() !== "");
+    const lines = readFile(textFile);
     let flag = false;
 
     const updatedLines = lines.map(line => {
@@ -287,9 +307,7 @@ let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-3
         validateMonth(month);
     
 
-        const file = fs.readFileSync(textFile, 'utf8');
-        const lines = file.split("\n").filter(line => line.trim() !== "");
-        
+        const lines = readFile(textFile);
         let count = 0;
 
         const driverBonus = lines.map(line => {
@@ -316,6 +334,7 @@ let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-3
     }
     catch(err){
         console.log(err);
+        return null;
     }
 }
 
@@ -328,8 +347,42 @@ let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-3
 // ============================================================
 function getTotalActiveHoursPerMonth(textFile, driverID, month) {
     // TODO: Implement this function
+    
+    try{
+        if (!driverID) 
+            throw new Error("driverID is required");
+        validateMonth(month);
 
+        const lines = readFile(textFile);
+    
+        const allActiveTime = lines.map(line => {
+                const data = line.split(",");
+                if(data[0] == driverID){
+                    if(isNaN(new Date(data[2]).getTime()))
+                        throw new Error("Invalid Date");
+                    let date = data[2].split("-");
+                    if(Number(date[1]) == Number(month)){
+                        const activeTime = timeToSec(data[7]);
+                        return activeTime;
+                    } 
+                }
+                return null;
+            })
+            .filter(m => m !== null);
+
+        let totalActiveTime = allActiveTime.reduce((total, num) => total + num, 0);
+
+        return secToTime(totalActiveTime);
+
+        }
+
+    catch(err){
+        console.log(err);
+        return null;
+    }
 }
+
+// console.log(getTotalActiveHoursPerMonth("shifts.txt", "D1001", "4"));
 
 // ============================================================
 // Function 9: getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, month)
@@ -342,7 +395,54 @@ function getTotalActiveHoursPerMonth(textFile, driverID, month) {
 // ============================================================
 function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, month) {
     // TODO: Implement this function
+
+    try{
+        // if (!bonusCount) 
+        //     throw new Error("bonusCount is required");
+        if (!driverID) 
+            throw new Error("driverID is required");
+        validateMonth(month);
+
+        const lines = readFile(textFile);
+        const rateLines = readFile(rateFile);
+        const days = ["Sunday","Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"];
+        const holiday = rateLines.map(line => {
+            const data = line.split(",");
+            if(data[0] == driverID)
+                return data[1];
+            return null;
+        })
+        .filter(m => m !== null);
+
+        let requiredSecs = 0;
+        requiredSecs -= bonusCount * 2 * 3600;
+
+        lines.slice(1).forEach(line => {
+            const data = line.split(",");
+            date = new Date(data[2]);
+            m = date.getMonth() + 1;
+            const day = days[date.getDay()];
+            if(day == holiday[0])
+                return;
+            if(data[0] == driverID && m == month){
+                if(date >= new Date("2025-04-10") && date <= new Date("2025-04-30")){
+                    requiredSecs += (6*3600);
+                }
+                else{
+                    requiredSecs += (8*3600 + 24*60);
+                }
+            }            
+        })
+        return secToTime(requiredSecs);
+    
+    }
+    catch(err){
+        console.log(err);
+        return null;
+    }
 }
+
+console.log(getRequiredHoursPerMonth("shifts.txt", "driverRates.txt", 1, "D1001", "4"));
 
 // ============================================================
 // Function 10: getNetPay(driverID, actualHours, requiredHours, rateFile)
@@ -354,7 +454,50 @@ function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, mont
 // ============================================================
 function getNetPay(driverID, actualHours, requiredHours, rateFile) {
     // TODO: Implement this function
+    try{
+        if (!driverID) 
+            throw new Error("driverID is required");
+        validateHoursSum(actualHours);
+        validateHoursSum(requiredHours);
+
+        const rateLines = readFile(rateFile);
+
+        const basePay = Number(rateLines.find(line => line.split(",")[0] === driverID)?.split(",")[2] || 0);
+        const tier = Number(rateLines.find(line => line.split(",")[0] === driverID)?.split(",")[3] || 0);
+        let missingHoursInSec = timeToSec(requiredHours) - timeToSec(actualHours) < 0 ? 0 : timeToSec(requiredHours) - timeToSec(actualHours);
+
+        switch(tier) {
+            case 1:
+                missingHoursInSec = missingHoursInSec - 50*3600 < 0 ? 0 : missingHoursInSec - 50*3600;
+                break;
+            case 2:
+                missingHoursInSec = missingHoursInSec - 20*3600 < 0 ? 0 : missingHoursInSec - 20*3600;
+                break;
+            case 3:
+                missingHoursInSec = missingHoursInSec - 10*3600 < 0 ? 0 : missingHoursInSec - 10*3600;
+                break;
+            case 4:
+                missingHoursInSec = missingHoursInSec - 3*3600 < 0 ? 0 : missingHoursInSec - 3*3600;
+                break;
+            default:
+                missingHoursInSec = 0;
+        }
+
+        const missingHours = Math.floor(missingHoursInSec/3600);
+        const deductionRatePerHour = Math.floor(basePay / 185);
+        const salaryDeduction = missingHours * deductionRatePerHour;
+        const netPay = basePay - salaryDeduction;
+
+        return netPay;
+    }
+    catch(err){
+        console.log(err);
+        return null;
+    }
 }
+
+console.log(getNetPay("D1001", "146:20:00", "168:00:00", "driverRates.txt"));
+
 
 module.exports = {
     getShiftDuration,
