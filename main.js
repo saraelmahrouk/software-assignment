@@ -7,7 +7,8 @@ function timeToSec(time){
     const timeFormat = time.split(" ");
     let [h, m, s] = timeFormat[0].split(":").map(Number);
     
-    if(timeFormat.length > 1 && timeFormat[1] == "pm") h += 12;
+    if(timeFormat.length > 1 && timeFormat[1] == "pm" && h !== 12) h += 12;
+    if (timeFormat.length > 1 && timeFormat[1] == "am" && h === 12) h = 0;  
 
     let timeSec = h*3600 + m*60 + s;
     return timeSec;
@@ -120,13 +121,16 @@ function getIdleTime(startTime, endTime) {
     const lowerBound = 8*3600;
     const upperBound = 22*3600;
  
-    let startSec = timeToSec(startTime);
-    let endSec = timeToSec(endTime);
+    const shiftStart = timeToSec(startTime);
+    const shiftEnd   = timeToSec(endTime);
 
-    let idleTime = 0;
-    idleTime += startSec < lowerBound ? lowerBound - startSec : 0;
-    idleTime += endSec > upperBound ? endSec - upperBound : 0;
+    const activeStart = Math.min(Math.max(shiftStart, lowerBound), upperBound);
+    const activeEnd   = Math.min(Math.max(shiftEnd,   lowerBound), upperBound);
 
+    const activeSeconds = activeEnd - activeStart;
+    const shiftDuration = shiftEnd - shiftStart;
+
+    const idleTime = shiftDuration - activeSeconds;
     return secToTime(idleTime);
 }
 
@@ -170,7 +174,7 @@ function metQuota(date, activeTime) {
     const eidDailyQuota = timeToSec("6:00:00");
     const activeSec = timeToSec(activeTime);
 
-    if( date > "2025-04-10" && date < "2025-04-30")
+    if( date >= "2025-04-10" && date <= "2025-04-30")
         return activeSec >= eidDailyQuota
     return activeSec >= dailyQuota;
 }
@@ -264,8 +268,8 @@ function addShiftRecord(textFile, shiftObj) {
     if (!driverID) 
         throw new Error("driverID is required");
 
-     if (!newValue) 
-        throw new Error("newValue is required");
+    //  if (!newValue) 
+    //     throw new Error("newValue is required");
 
     const lines = readFile(textFile);
     let flag = false;
@@ -273,7 +277,7 @@ function addShiftRecord(textFile, shiftObj) {
     const updatedLines = lines.map(line => {
             if (line.includes(driverID) && line.includes(date)){
                 let data = line.split(",");
-                data[9] = newValue;
+                data[9] = String(newValue).trim();
                 flag = true;
                 return data.join(",");
             }
@@ -325,10 +329,12 @@ function addShiftRecord(textFile, shiftObj) {
         })
         .filter(m => m !== null);
 
-        let countTrue = driverBonus
+        const driverExists = lines.some(line => line.split(",")[0] === driverID);
+        if (!driverExists) return -1;
+        const countTrue = driverBonus
                         .filter(x => x.trim() === 'true')
                         .length;
-        countTrue = countTrue > 0 ? countTrue: -1;
+        
         return countTrue;
     
     }
@@ -415,17 +421,16 @@ function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, mont
         .filter(m => m !== null);
 
         let requiredSecs = 0;
-        requiredSecs -= bonusCount * 2 * 3600;
-
-        lines.slice(1).forEach(line => {
+        
+        lines.forEach(line => {
             const data = line.split(",");
-            date = new Date(data[2]);
-            m = date.getMonth() + 1;
+            const date = new Date(data[2]);
+            const m = date.getMonth() + 1;
             const day = days[date.getDay()];
             if(day == holiday[0])
                 return;
             if(data[0] == driverID && m == month){
-                if(date >= new Date("2025-04-10") && date <= new Date("2025-04-30")){
+                if(data[2] >= "2025-04-10" && data[2] <= "2025-04-30"){
                     requiredSecs += (6*3600);
                 }
                 else{
@@ -433,6 +438,7 @@ function getRequiredHoursPerMonth(textFile, rateFile, bonusCount, driverID, mont
                 }
             }            
         })
+        requiredSecs -= bonusCount * 2 * 3600;
         return secToTime(requiredSecs);
     
     }
