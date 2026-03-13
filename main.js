@@ -120,7 +120,6 @@ function getActiveTime(shiftDuration, idleTime) {
 
 
 }
-console.log(getActiveTime("6:01:20", "00:00:00"));
 
 
 // ============================================================
@@ -131,9 +130,22 @@ console.log(getActiveTime("6:01:20", "00:00:00"));
 // ============================================================
 function metQuota(date, activeTime) {
     // TODO: Implement this function
+    
+    if(isNaN(new Date(date).getTime()))
+        throw new Error("Invalid Date");
 
+    validateTimeFormat(activeTime);
+
+    const dailyQuota = timeToSec("8:24:00");
+    const eidDailyQuota = timeToSec("6:00:00");
+    const activeSec = timeToSec(activeTime);
+
+    if( date > "2025-04-10" && date < "2025-04-30")
+        return activeSec >= eidDailyQuota
+    return activeSec >= dailyQuota;
 }
 
+// console.log(metQuota("2025-03-23", "5:42:59"));
 // ============================================================
 // Function 5: addShiftRecord(textFile, shiftObj)
 // textFile: (typeof string) path to shifts text file
