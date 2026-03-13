@@ -1,4 +1,4 @@
-const fs = require("fs").promises;
+const fs = require("fs");
 const { start } = require("repl");
 
 
@@ -48,6 +48,12 @@ function validateShiftObj(shiftObj) {
     if (!shiftObj.driverName) throw new Error("driverName is required");
     if (!shiftObj.date) throw new Error("date is required");
     if (!shiftObj.startTime || !shiftObj.endTime) throw new Error("startTime and endTime are required");
+}
+
+function validateMonth(month){
+    const regexMonth = /^(0?[1-9]|1[1-2])$/; 
+    if(!regexMonth.test(month))
+        throw new Error("Invalid month format");
 }
 
 // ============================================================
@@ -154,13 +160,13 @@ function metQuota(date, activeTime) {
 // shiftObj: (typeof object) has driverID, driverName, date, startTime, endTime
 // Returns: object with 10 properties or empty object {}
 // ============================================================
-async function addShiftRecord(textFile, shiftObj) {
+function addShiftRecord(textFile, shiftObj) {
     // TODO: Implement this function
     try{
 
         validateShiftObj(shiftObj);
 
-        const data = await fs.readFile( textFile, 'utf8')     
+        const data = fs.readFileSync( textFile, 'utf8')     
         let flag = false;
         const lines = data.split("\n").filter(line => line.trim() !== "");
 
@@ -196,7 +202,7 @@ async function addShiftRecord(textFile, shiftObj) {
             } else {
                 lines.splice(insertIndex + 1, 0, newLine);
             }   
-            await fs.writeFile(textFile, lines.join("\n") + "\n", 'utf8');
+            fs.writeFileSync(textFile, lines.join("\n") + "\n", 'utf8');
             console.log("File written successfully");
             return shiftObj;
         }
@@ -207,16 +213,17 @@ async function addShiftRecord(textFile, shiftObj) {
     }
     catch (err){
         console.log(err);
+        return {};
     }
 }
 
-// let shiftObj = { driverID: "", driverName: "Ahmed Hassan", date: "2025-04-30",
-//  startTime: "6:32:26 am",  endTime: "7:26:20 pm" };
-//  let textFile = "shifts.txt"; 
-// (async () => {
-//     let result = await addShiftRecord(textFile, shiftObj);
-//     console.log(result);
-// })();
+let shiftObj = { driverID: "D1001", driverName: "Ahmed Hassan", date: "2025-04-30",
+ startTime: "6:32:26 am",  endTime: "7:26:20 pm" };
+ let textFile = "shifts.txt"; 
+( () => {
+    let result = addShiftRecord(textFile, shiftObj);
+    console.log(result);
+})();
 
 // ============================================================
 // Function 6: setBonus(textFile, driverID, date, newValue)
@@ -226,7 +233,7 @@ async function addShiftRecord(textFile, shiftObj) {
 // newValue: (typeof boolean)
 // Returns: nothing (void)
 // ============================================================
-async function setBonus(textFile, driverID, date, newValue) {
+ function setBonus(textFile, driverID, date, newValue) {
     // TODO: Implement this function
 
     try{
@@ -239,7 +246,7 @@ async function setBonus(textFile, driverID, date, newValue) {
      if (!newValue) 
         throw new Error("newValue is required");
 
-    const file  = await fs.readFile(textFile, 'utf8');
+    const file  = fs.readFileSync(textFile, 'utf8');
     const lines = file.split("\n").filter(line => line.trim() !== "");
     let flag = false;
 
@@ -247,8 +254,8 @@ async function setBonus(textFile, driverID, date, newValue) {
             if (line.includes(driverID) && line.includes(date)){
                 let data = line.split(",");
                 data[9] = newValue;
-                return data.join(",");
                 flag = true;
+                return data.join(",");
             }
             return line;
           })
@@ -256,7 +263,7 @@ async function setBonus(textFile, driverID, date, newValue) {
         console.log("No such entry exists");
     }
     else{
-        await fs.writeFile(textFile, updatedLines.join("\n") + "\n", 'utf8');
+         fs.writeFileSync(textFile, updatedLines.join("\n") + "\n", 'utf8');
         console.log("Changes have been made successfully");}
     }
     catch (err){
@@ -265,10 +272,6 @@ async function setBonus(textFile, driverID, date, newValue) {
 
 }
 
-( async () => {
-    console.log(await setBonus("shifts.txt", "D1222", "2025-04-05", true));
-    
-})();
 // ============================================================
 // Function 7: countBonusPerMonth(textFile, driverID, month)
 // textFile: (typeof string) path to shifts text file
@@ -276,8 +279,44 @@ async function setBonus(textFile, driverID, date, newValue) {
 // month: (typeof string) formatted as mm or m
 // Returns: number (-1 if driverID not found)
 // ============================================================
-function countBonusPerMonth(textFile, driverID, month) {
+ function countBonusPerMonth(textFile, driverID, month) {
     // TODO: Implement this function
+    try{
+        if (!driverID) 
+            throw new Error("driverID is required");
+        validateMonth(month);
+    
+
+        const file = fs.readFileSync(textFile, 'utf8');
+        const lines = file.split("\n").filter(line => line.trim() !== "");
+        
+        let count = 0;
+
+        const driverBonus = lines.map(line => {
+            const data = line.split(",");
+            if(data[0] == driverID){
+                if(isNaN(new Date(data[2]).getTime()))
+                    throw new Error("Invalid Date");
+                let date = data[2].split("-");
+                if(Number(date[1]) == Number(month)){
+                    const bonus = data[9];
+                    return bonus; 
+                } 
+            }
+            return null;
+        })
+        .filter(m => m !== null);
+
+        let countTrue = driverBonus
+                        .filter(x => x.trim() === 'true')
+                        .length;
+        countTrue = countTrue > 0 ? countTrue: -1;
+        return countTrue;
+    
+    }
+    catch(err){
+        console.log(err);
+    }
 }
 
 // ============================================================
@@ -289,6 +328,7 @@ function countBonusPerMonth(textFile, driverID, month) {
 // ============================================================
 function getTotalActiveHoursPerMonth(textFile, driverID, month) {
     // TODO: Implement this function
+
 }
 
 // ============================================================
