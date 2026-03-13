@@ -1,9 +1,5 @@
-const fs = require("fs");
+const fs = require("fs").promises;
 const { start } = require("repl");
-
-fs.readFile('shifts.txt', 'utf8', (err, data) => {
-    if (err) throw err;
-});
 
 
 function timeToSec(time){
@@ -47,6 +43,12 @@ function validateMatchingFormat(time1, time2){
 
 }
 
+function validateShiftObj(shiftObj) {
+    if (!shiftObj.driverID) throw new Error("driverID is required");
+    if (!shiftObj.driverName) throw new Error("driverName is required");
+    if (!shiftObj.date) throw new Error("date is required");
+    if (!shiftObj.startTime || !shiftObj.endTime) throw new Error("startTime and endTime are required");
+}
 
 // ============================================================
 // Function 1: getShiftDuration(startTime, endTime)
@@ -152,9 +154,69 @@ function metQuota(date, activeTime) {
 // shiftObj: (typeof object) has driverID, driverName, date, startTime, endTime
 // Returns: object with 10 properties or empty object {}
 // ============================================================
-function addShiftRecord(textFile, shiftObj) {
+async function addShiftRecord(textFile, shiftObj) {
     // TODO: Implement this function
+    try{
+
+        validateShiftObj(shiftObj);
+
+        const data = await fs.readFile( textFile, 'utf8')     
+        let flag = false;
+        const lines = data.split("\n").filter(line => line.trim() !== "");
+
+        lines.forEach(line => {
+            if (line.includes(shiftObj.driverID) && line.includes(shiftObj.date)){
+                flag = true;
+            }
+        })
+        if(!flag){
+
+            shiftObj.shiftDuration = getShiftDuration(shiftObj.startTime, shiftObj.endTime);
+            shiftObj.idleTime = getIdleTime(shiftObj.startTime, shiftObj.endTime);
+            shiftObj.activeTime = getActiveTime(shiftObj.shiftDuration, shiftObj.idleTime);
+            shiftObj.metQuota = metQuota(shiftObj.date, shiftObj.activeTime);
+            shiftObj.hasBonus = false;
+
+            const newLine = [
+                shiftObj.driverID,
+                shiftObj.driverName,
+                shiftObj.date,
+                shiftObj.startTime,
+                shiftObj.endTime,
+                shiftObj.shiftDuration,
+                shiftObj.idleTime,
+                shiftObj.activeTime,
+                shiftObj.metQuota,
+                shiftObj.hasBonus
+            ].join(",");
+
+            let insertIndex = lines.map(line => line.split(",")[0]).lastIndexOf(shiftObj.driverID);
+            if (insertIndex === -1) {
+            lines.push(newLine);
+            } else {
+                lines.splice(insertIndex + 1, 0, newLine);
+            }   
+            await fs.writeFile(textFile, lines.join("\n") + "\n", 'utf8');
+            console.log("File written successfully");
+            return shiftObj;
+        }
+        else{
+            console.log("Already in the file");
+            return {};
+        }
+    }
+    catch (err){
+        console.log(err);
+    }
 }
+
+// let shiftObj = { driverID: "", driverName: "Ahmed Hassan", date: "2025-04-30",
+//  startTime: "6:32:26 am",  endTime: "7:26:20 pm" };
+//  let textFile = "shifts.txt"; 
+// (async () => {
+//     let result = await addShiftRecord(textFile, shiftObj);
+//     console.log(result);
+// })();
 
 // ============================================================
 // Function 6: setBonus(textFile, driverID, date, newValue)
@@ -164,10 +226,49 @@ function addShiftRecord(textFile, shiftObj) {
 // newValue: (typeof boolean)
 // Returns: nothing (void)
 // ============================================================
-function setBonus(textFile, driverID, date, newValue) {
+async function setBonus(textFile, driverID, date, newValue) {
     // TODO: Implement this function
+
+    try{
+    if(isNaN(new Date(date).getTime()))
+        throw new Error("Invalid Date");
+
+    if (!driverID) 
+        throw new Error("driverID is required");
+
+     if (!newValue) 
+        throw new Error("newValue is required");
+
+    const file  = await fs.readFile(textFile, 'utf8');
+    const lines = file.split("\n").filter(line => line.trim() !== "");
+    let flag = false;
+
+    const updatedLines = lines.map(line => {
+            if (line.includes(driverID) && line.includes(date)){
+                let data = line.split(",");
+                data[9] = newValue;
+                return data.join(",");
+                flag = true;
+            }
+            return line;
+          })
+    if(!flag){
+        console.log("No such entry exists");
+    }
+    else{
+        await fs.writeFile(textFile, updatedLines.join("\n") + "\n", 'utf8');
+        console.log("Changes have been made successfully");}
+    }
+    catch (err){
+        console.log(err);
+    }
+
 }
 
+( async () => {
+    console.log(await setBonus("shifts.txt", "D1222", "2025-04-05", true));
+    
+})();
 // ============================================================
 // Function 7: countBonusPerMonth(textFile, driverID, month)
 // textFile: (typeof string) path to shifts text file
